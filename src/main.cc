@@ -61,31 +61,39 @@ void setup_drums()
     high_hat_trigger_input.begin();
 }
 
-
 constexpr unsigned PERCUSSION_CHANNEL = 10;
 constexpr unsigned BASS_DRUM1 = 36;
 constexpr unsigned ELECTRIC_SNARE = 40;
 constexpr unsigned CLOSED_HIHAT = 42;
 constexpr unsigned OPEN_HIHAT = 46;
 
+constexpr byte ACCENT_THRESHOLD = 110;
+
 void handleNoteOn(byte inChannel, byte inNote, byte inVelocity)
 {
     switch (inNote) {
-        case BASS_DRUM1: bass_trigger = peaks::CONTROL_GATE_RISING; break;
-        case ELECTRIC_SNARE: snare_trigger = peaks::CONTROL_GATE_RISING; break;
-        case CLOSED_HIHAT:
-            high_hat.set_open(false);
-            high_hat_trigger = peaks::CONTROL_GATE_RISING;
-            break;
-        case OPEN_HIHAT:
-            high_hat.set_open(true);
-            high_hat_trigger = peaks::CONTROL_GATE_RISING;
-            break;
+    case BASS_DRUM1:
+        bass_is_accented = inVelocity > ACCENT_THRESHOLD ? true : false;
+        bass_trigger = peaks::CONTROL_GATE_RISING; break;
+    case ELECTRIC_SNARE:
+        snare_is_accented = inVelocity > ACCENT_THRESHOLD ? true : false;
+        snare_trigger = peaks::CONTROL_GATE_RISING; break;
+    case CLOSED_HIHAT:
+        high_hat_is_accented = inVelocity > ACCENT_THRESHOLD ? true : false;
+        high_hat.set_open(false);
+        high_hat_trigger = peaks::CONTROL_GATE_RISING;
+        break;
+    case OPEN_HIHAT:
+        high_hat_is_accented = inVelocity > ACCENT_THRESHOLD ? true : false;
+        high_hat.set_open(true);
+        high_hat_trigger = peaks::CONTROL_GATE_RISING;
+        break;
     }
 }
 
 void handleNoteOff(byte inChannel, byte inNote, byte inVelocity)
 {
+    // nothing... we let the drum play for as long as needed - trigger only
 }
 
 void setup()
@@ -97,6 +105,7 @@ void setup()
 
     midi1.setHandleNoteOn(handleNoteOn);
     midi1.setHandleNoteOff(handleNoteOff);
+    // TODO: setHandleControlChange for midi mapped drum param settings
     midi1.begin();
 
     //initialize i2s with configurations above

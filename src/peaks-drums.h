@@ -549,28 +549,25 @@ public:
     HighHat() {}
     ~HighHat() {}
 
-    static constexpr uint32_t CLOSED_DECAY = 4093;
-    static constexpr uint32_t OPEN_DECAY   = 4095;
-
-    constexpr static int16_t DEFAULT_FREQUENCY      = 0;
-    constexpr static uint16_t DEFAULT_TONE          = 32768;
-    constexpr static uint16_t DEFAULT_CLOSED_DECAY  = 4093;
-    constexpr static uint16_t DEFAULT_OPEN_DECAY    = 4095;
+    constexpr static uint16_t DEFAULT_FREQUENCY     = 105 << 7;  // 8kHz
+    constexpr static uint16_t DEFAULT_TONE          = 110 << 7;  // 13kHz
+    constexpr static uint16_t DEFAULT_CLOSED_DECAY  = 4093 << 4;
+    constexpr static uint16_t DEFAULT_OPEN_DECAY    = 4095 << 4;
 
     void Init() {
         noise_.Init();
-        noise_.set_frequency(105 << 7); // 8kHz
+        noise_.set_frequency(DEFAULT_FREQUENCY);
         noise_.set_resonance(24000);
         noise_.set_mode(SVF_MODE_BP);
 
         vca_coloration_.Init();
-        vca_coloration_.set_frequency(110 << 7); // 13kHz
+        vca_coloration_.set_frequency(DEFAULT_TONE);
         vca_coloration_.set_resonance(0);
         vca_coloration_.set_mode(SVF_MODE_HP);
 
         vca_envelope_.Init();
         vca_envelope_.set_delay(0);
-        vca_envelope_.set_decay(CLOSED_DECAY);
+        vca_envelope_.set_decay(DEFAULT_CLOSED_DECAY);
     }
 
     int16_t ProcessSingleSample(uint8_t control) {
@@ -658,8 +655,7 @@ public:
     }
 
     void set_decay(uint16_t decay) {
-        // TODO: better scaling? 4095 is max, ie. >> 4
-        vca_envelope_.set_decay(decay);
+        vca_envelope_.set_decay(decay >> 4);
     }
 
     void set_tone(uint16_t tone) {
@@ -684,7 +680,8 @@ public:
 
     bool open = false;
     uint16_t freq_param, tone_param;
-    uint16_t closed_decay_param = CLOSED_DECAY, open_decay_param = OPEN_DECAY;
+    uint16_t closed_decay_param = DEFAULT_CLOSED_DECAY,
+             open_decay_param = DEFAULT_OPEN_DECAY;
 };
 
 } // end namespace peaks
