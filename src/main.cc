@@ -1,11 +1,11 @@
-// https://github.com/LilyGO/TTGO-T8-ESP32/blob/master/ESP32_PCM5102/ESP32_PCM5102.ino
 #include <Arduino.h>
 #include <driver/i2s.h>
-#include <EasyButton.h>
 #include <HardwareSerial.h>
 #include <MIDI.h>
+#include <SH1106Spi.h>
 
 #include "peaks-drums.h"
+#include "ui.h"
 
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial2, midi1);
 
@@ -13,18 +13,20 @@ peaks::BassDrum bass;
 peaks::SnareDrum snare;
 peaks::HighHat high_hat;
 
-#define BASS_TRIGGER_PIN         13
-#define SNARE_TRIGGER_PIN        12
-#define HIGH_HAT_TRIGGER_PIN     14
+#define KEY_TRIGGER_PIN    13
+#define S1_TRIGGER_PIN     12
+#define S2_TRIGGER_PIN     14
+
+
+// SPI OLED display.
+#define OLED_RST_PIN 4
+#define OLED_DC_PIN  2
+
+UI ui(KEY_TRIGGER_PIN, S1_TRIGGER_PIN, S2_TRIGGER_PIN, OLED_RST_PIN, OLED_DC_PIN);
 
 peaks::ControlBitMask bass_trigger;
 peaks::ControlBitMask snare_trigger;
 peaks::ControlBitMask high_hat_trigger;
-
-// already sets pullups and stuff on begin() call
-EasyButton bass_trigger_input{BASS_TRIGGER_PIN};
-EasyButton snare_trigger_input{SNARE_TRIGGER_PIN};
-EasyButton high_hat_trigger_input{HIGH_HAT_TRIGGER_PIN};
 
 bool bass_is_accented = false;
 bool snare_is_accented = false;
@@ -55,10 +57,6 @@ void setup_drums()
     bass.Init();
     snare.Init();
     high_hat.Init();
-
-    bass_trigger_input.begin();
-    snare_trigger_input.begin();
-    high_hat_trigger_input.begin();
 }
 
 constexpr unsigned PERCUSSION_CHANNEL = 10;
@@ -98,15 +96,17 @@ void handleNoteOff(byte inChannel, byte inNote, byte inVelocity)
 
 void setup()
 {
-    setup_drums();
-
     Serial.begin(115200);
     Serial.println("Init");
+
+    ui.init();
+
+    setup_drums();
 
     midi1.setHandleNoteOn(handleNoteOn);
     midi1.setHandleNoteOff(handleNoteOff);
     // TODO: setHandleControlChange for midi mapped drum param settings
-    midi1.begin();
+    midi1.begin(10); // we're drums, we're at channel 10
 
     //initialize i2s with configurations above
     i2s_driver_install((i2s_port_t)i2s_num, &i2s_config, 0, NULL);
@@ -117,7 +117,7 @@ void next_sample(int16_t *left_sample, int16_t *right_sample)
 {
     int32_t b = bass.ProcessSingleSample(bass_trigger) >> 2;
     int32_t s = snare.ProcessSingleSample(snare_trigger) >> 2;
-    int32_t h = high_hat.ProcessSingleSample(high_hat_trigger);
+    int32_t h = high_hat.ProcessSingleSample(high_hat_trigger) >> 2;
 
     if (bass_is_accented)
         b <<= 1;
@@ -153,26 +153,9 @@ void feed_i2s() {
     }
 }
 
-void scan_inputs() {
-    bass_trigger_input.read();
-    snare_trigger_input.read();
-    high_hat_trigger_input.read();
-
-    if (bass_trigger_input.wasPressed())
-        bass_trigger = peaks::CONTROL_GATE_RISING;
-    if (snare_trigger_input.wasPressed())
-        snare_trigger = peaks::CONTROL_GATE_RISING;
-    if (high_hat_trigger_input.wasPressed())
-        high_hat_trigger = peaks::CONTROL_GATE_RISING;
-}
-
-void handle_midi() {
-    midi1.read();
-}
-
 void loop()
 {
-    handle_midi();
-    scan_inputs();
+    midi1.read();
+    ui.update();
     feed_i2s();
 }
