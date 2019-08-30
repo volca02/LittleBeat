@@ -1,3 +1,5 @@
+#pragma once
+
 namespace peaks {
 
 // Code in this namespace is copied nearly verbatim from Peaks.
@@ -567,7 +569,7 @@ public:
 
         vca_envelope_.Init();
         vca_envelope_.set_delay(0);
-        vca_envelope_.set_decay(DEFAULT_CLOSED_DECAY);
+        vca_envelope_.set_decay(DEFAULT_CLOSED_DECAY >> 4);
     }
 
     int16_t ProcessSingleSample(uint8_t control) {
