@@ -1,4 +1,4 @@
-# LittleBeats
+# LittleBeat
 
 This is a standalone drum sound synthesizer project, based on the code from Mutable Peaks drum section.
 
