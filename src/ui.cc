@@ -85,7 +85,7 @@ void PercussionScreen::draw() {
     percussion->params_fetch_current(params);
 
     for (unsigned id = 0; id < pc; ++id) {
-        draw_gauge(display, 5, 25 + id * 7, 100, 5, params[id]);
+        draw_gauge(display, 5, 25 + id * 7, 118, 5, params[id]);
     }
 
     display.display();
@@ -144,7 +144,7 @@ void ParamScreen::draw() {
     uint16_t params[peaks::PARAM_MAX];
     percussion->params_fetch_current(params);
 
-    draw_gauge(display, 5, 35, 100, 10, params[index], set_mode);
+    draw_gauge(display, 5, 35, 118, 10, params[index], set_mode);
 
     char str_val[8];
     itoa(params[index], str_val, 10);
