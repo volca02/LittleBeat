@@ -553,8 +553,8 @@ public:
     HighHat() {}
     ~HighHat() {}
 
-    constexpr static uint16_t DEFAULT_FREQUENCY     = 105 << 8;  // 8kHz, regularized to 64k
-    constexpr static uint16_t DEFAULT_TONE          = 110 << 8;  // 13kHz, regularized to 64k
+    constexpr static uint16_t DEFAULT_FREQUENCY     = 105 << 9;  // 8kHz, regularized to 64k
+    constexpr static uint16_t DEFAULT_TONE          = 47104;     // ~13kHz, regularized as needed in set_tone
     constexpr static uint16_t DEFAULT_CLOSED_DECAY  = 32768;
     constexpr static uint16_t DEFAULT_OPEN_DECAY    = 65535;
 
@@ -654,9 +654,8 @@ public:
     }
 
     void set_frequency(uint16_t frequency) {
-        // TODO: better scaling? 32kHz max i.e. >> 1
         freq_param = frequency;
-        noise_.set_frequency(frequency >> 1);
+        noise_.set_frequency(frequency >> 2);
     }
 
     void set_decay(uint16_t decay) {
@@ -665,7 +664,7 @@ public:
 
     void set_tone(uint16_t tone) {
         tone_param = tone;
-        vca_coloration_.set_frequency(tone >> 1);
+        vca_coloration_.set_frequency(8192 + (tone >> 3));
     }
 
     void set_open(bool open) {
