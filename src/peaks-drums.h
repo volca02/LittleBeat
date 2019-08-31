@@ -2,7 +2,11 @@
 
 namespace peaks {
 
-// Code in this namespace is copied nearly verbatim from Peaks.
+// Note: Have to change this if there ever comes a percussion with more
+// parameters
+const uint16_t PARAM_MAX = 4;
+
+// Code in this namespace is largerly based on Peaks source code.
 // https://github.com/pichenettes/eurorack
 
 const uint16_t kAdcThresholdUnlocked = 1 << (16 - 10); // 10 bits
@@ -238,8 +242,6 @@ private:
     static uint32_t rng_state_;
 };
 
-uint32_t Random::rng_state_ = 0x21;
-
 // ancestor to configurable objects - exposes param names, default values and current values
 class Configurable {
 public:
@@ -372,7 +374,7 @@ public:
     }
 
     void set_punch(uint16_t punch) {
-        punch_param;
+        punch_param = punch;
         resonator_.set_punch(punch * punch >> 16);
     }
 
@@ -551,25 +553,26 @@ public:
     HighHat() {}
     ~HighHat() {}
 
-    constexpr static uint16_t DEFAULT_FREQUENCY     = 105 << 7;  // 8kHz
-    constexpr static uint16_t DEFAULT_TONE          = 110 << 7;  // 13kHz
-    constexpr static uint16_t DEFAULT_CLOSED_DECAY  = 4093 << 4;
-    constexpr static uint16_t DEFAULT_OPEN_DECAY    = 4095 << 4;
+    constexpr static uint16_t DEFAULT_FREQUENCY     = 105 << 8;  // 8kHz, regularized to 64k
+    constexpr static uint16_t DEFAULT_TONE          = 110 << 8;  // 13kHz, regularized to 64k
+    constexpr static uint16_t DEFAULT_CLOSED_DECAY  = 32768;
+    constexpr static uint16_t DEFAULT_OPEN_DECAY    = 65535;
 
     void Init() {
         noise_.Init();
-        noise_.set_frequency(DEFAULT_FREQUENCY);
         noise_.set_resonance(24000);
         noise_.set_mode(SVF_MODE_BP);
+        // sets both param and frequency
+        set_frequency(DEFAULT_FREQUENCY);
 
         vca_coloration_.Init();
-        vca_coloration_.set_frequency(DEFAULT_TONE);
         vca_coloration_.set_resonance(0);
         vca_coloration_.set_mode(SVF_MODE_HP);
+        set_tone(DEFAULT_TONE);
 
         vca_envelope_.Init();
         vca_envelope_.set_delay(0);
-        vca_envelope_.set_decay(DEFAULT_CLOSED_DECAY >> 4);
+        set_decay(DEFAULT_CLOSED_DECAY);
     }
 
     int16_t ProcessSingleSample(uint8_t control) {
@@ -653,17 +656,16 @@ public:
     void set_frequency(uint16_t frequency) {
         // TODO: better scaling? 32kHz max i.e. >> 1
         freq_param = frequency;
-        noise_.set_frequency(frequency);
+        noise_.set_frequency(frequency >> 1);
     }
 
     void set_decay(uint16_t decay) {
-        vca_envelope_.set_decay(decay >> 4);
+        vca_envelope_.set_decay(4092 + (decay >> 14));
     }
 
     void set_tone(uint16_t tone) {
-        // TODO: better scaling? 32kHz max i.e. >> 1
         tone_param = tone;
-        vca_coloration_.set_frequency(tone);
+        vca_coloration_.set_frequency(tone >> 1);
     }
 
     void set_open(bool open) {
