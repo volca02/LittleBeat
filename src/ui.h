@@ -57,11 +57,14 @@ public:
     ParamScreen(UI &ui) : UIScreen(ui) {}
     void onKey(KeyType key) override;
     void draw() override;
-    void set_percussion(int idx, const char *name);
 
+    void set_percussion(int idx);
+    void prev_percussion();
+    void next_percussion();
 protected:
     peaks::Configurable *percussion;
     const char *name; // name of the current percussion
+    int perc_index = 0;
     int index = 0; // index of configurable parameter
     bool set_mode; // if true, we're setting the parameter, not selecting one
 };

@@ -30,11 +30,17 @@ constexpr uint16_t ROTENCODER_STEP = 1024;
 
 /// safely increments the value by N steps
 void safe_incr(uint16_t &tgt, uint16_t steps = ROTENCODER_STEP) {
-    if (tgt < (0xFFFF-steps+1)) tgt+=steps;
+    if (tgt <= (0xFFFF - steps))
+        tgt+=steps;
+    else
+        tgt=0xFFFF;
 }
 
 void safe_decr(uint16_t &tgt, uint16_t steps = ROTENCODER_STEP) {
-    if (tgt > steps) tgt-=steps;
+    if (tgt >= steps)
+        tgt -= steps;
+    else
+        tgt = 0;
 }
 
 } // namespace
@@ -50,8 +56,7 @@ void PercussionScreen::onKey(KeyType key) {
         // transition to the parameter selection screen
         ParamScreen *ps =
             static_cast<ParamScreen *>(ui.get_screen(UI::ST_PARAM));
-        const char *drum_name = ui.get_drummer().percussion_name(index);
-        ps->set_percussion(index, drum_name);
+        ps->set_percussion(index);
         ui.set_screen(UI::ST_PARAM);
         return;
     }
@@ -92,10 +97,25 @@ void PercussionScreen::draw() {
 }
 
 
-void ParamScreen::set_percussion(int idx, const char *nm) {
-    percussion = ui.get_drummer().get_percussion(idx);
-    name = nm;
+void ParamScreen::set_percussion(int idx) {
+    perc_index = idx;
+    percussion = ui.get_drummer().get_percussion(perc_index);
+    name = ui.get_drummer().percussion_name(perc_index);
     index = 0;
+}
+
+void ParamScreen::prev_percussion() {
+    int pc = ui.get_drummer().percussion_count();
+
+    if (--perc_index < 0) perc_index = pc - 1;
+
+    set_percussion(perc_index);
+}
+
+void ParamScreen::next_percussion() {
+    int pc = ui.get_drummer().percussion_count();
+    if (++perc_index >= pc) perc_index = 0;
+    set_percussion(perc_index);
 }
 
 void ParamScreen::onKey(KeyType key) {
@@ -119,11 +139,14 @@ void ParamScreen::onKey(KeyType key) {
         if (incr < 0) safe_decr(params[index]);
         percussion->params_set(params);
     } else {
-        // wraparound
         index += incr;
-        int pc = percussion->param_count();
-        if (index < 0) index = pc - 1;
-        if (index >= pc) index = 0;
+        if (index < 0) {
+            prev_percussion();
+            index = percussion->param_count() - 1;
+        } else if (index >= percussion->param_count()) {
+            next_percussion();
+            index = 0;
+        }
     }
 
     // schedule redraw
