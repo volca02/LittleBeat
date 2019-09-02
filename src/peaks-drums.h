@@ -806,8 +806,7 @@ public:
 
     inline void set_fm_amount(uint16_t fm_amount) {
         fm_param = fm_amount;
-        // NOTE: original had another >> 2 *3
-        fm_amount_ = (fm_amount >> 2);
+        fm_amount_ = ((fm_amount >> 2) >> 2 * 3);
     }
 
     inline void set_decay(uint16_t decay) {

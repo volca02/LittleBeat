@@ -95,10 +95,10 @@ public:
 protected:
     void next_sample(int16_t *left_sample, int16_t *right_sample)
     {
-        int32_t b = bass.ProcessSingleSample(bass_trigger) >> 2;
-        int32_t s = snare.ProcessSingleSample(snare_trigger) >> 2;
-        int32_t h = high_hat.ProcessSingleSample(high_hat_trigger) >> 2;
-        int32_t f = fm.ProcessSingleSample(fm_trigger) >> 2;
+        int32_t b = bass.ProcessSingleSample(bass_trigger) >> 3;
+        int32_t s = snare.ProcessSingleSample(snare_trigger) >> 3;
+        int32_t h = high_hat.ProcessSingleSample(high_hat_trigger) >> 3;
+        int32_t f = fm.ProcessSingleSample(fm_trigger) >> 3;
 
         if (bass_is_accented) b <<= 1;
         if (snare_is_accented) s <<= 1;
