@@ -128,8 +128,6 @@ public:
     ~Repeater() {}
 
     void Init() {
-        delay_ = 1.0e-3*48000;
-        counter_ = 0;
         decay_ = 3340;
         decay_term_ = 4095;
 
@@ -140,7 +138,6 @@ public:
 
     void Trigger(int32_t level) {
         rep_counter_ = 0;
-        counter_     = delay_;
         level_       = level;
         ex_.set_decay(decay_);
         ex_.Trigger(level_);
@@ -149,17 +146,13 @@ public:
     inline int32_t Process() {
         // TODO: transition to Decay-Only repeat (via exc.finished())
         int32_t exc = ex_.Process();
-        if (counter_ > 0) {
-            --counter_;
-            if (counter_ == 0) {
-                ++rep_counter_;
-                if (rep_counter_ == repeats_) {
-                    ex_.set_decay(decay_term_);
-                    ex_.Trigger(level_);
-                } else {
-                    counter_ = delay_;
-                    ex_.Trigger(level_);
-                }
+        if (ex_.finished()) {
+            ++rep_counter_;
+            if (rep_counter_ == repeats_) {
+                ex_.set_decay(decay_term_);
+                ex_.Trigger(level_);
+            } else if (rep_counter_ < repeats_) {
+                ex_.Trigger(level_);
             }
         }
 
@@ -167,7 +160,6 @@ public:
     }
 
     void set_repeats(uint32_t repeats) { repeats_ = repeats; }
-    void set_delay(uint32_t delay) { delay_ = delay; }
     void set_decay(uint32_t decay) { decay_ = decay; }
     void set_decay_term(uint32_t decay) { decay_term_ = decay; }
 
@@ -175,8 +167,6 @@ private:
     Excitation ex_;
 
     uint32_t level_;  // level for re-trigger
-    uint32_t delay_;  // delay of each initial pulse
-    uint32_t counter_;
     int32_t rep_counter_; // counts down the initial pulses (repeats_ to zero)
     uint32_t decay_;
     uint32_t decay_term_;
@@ -954,8 +944,8 @@ public:
     ~Clap() {};
 
     constexpr static uint16_t DEFAULT_FREQUENCY     = 42976;
-    constexpr static uint16_t DEFAULT_DELAY         = 36864;
-    constexpr static uint16_t DEFAULT_FAST_DECAY    = 35584;
+    constexpr static uint16_t DEFAULT_RESONANCE     = 65535;
+    constexpr static uint16_t DEFAULT_FAST_DECAY    = 8960;
     constexpr static uint16_t DEFAULT_LONG_DECAY    = 49151;
 
     void Init() {
@@ -964,12 +954,12 @@ public:
 
         set_fast_decay(DEFAULT_FAST_DECAY);
         set_long_decay(DEFAULT_LONG_DECAY);
-        set_delay(DEFAULT_DELAY);
 
         vca_filter_.Init();
         vca_filter_.set_resonance(1000);
         vca_filter_.set_mode(SVF_MODE_BP);
         set_frequency(DEFAULT_FREQUENCY);
+        set_resonance(DEFAULT_RESONANCE);
     }
 
     int16_t ProcessSingleSample(uint8_t control) {
@@ -995,7 +985,7 @@ public:
     const char *param_name(unsigned arg) const override {
         switch (arg) {
         case 0: return "Frequency";
-        case 1: return "Delay";
+        case 1: return "Resoncance";
         case 2: return "Fast Decay";
         case 3: return "Long Decay";
         default: return "?";
@@ -1004,21 +994,21 @@ public:
 
     void params_fetch_current(uint16_t *tgt) const override {
         tgt[0] = freq_param;
-        tgt[1] = delay_param;
+        tgt[1] = resonance_param;
         tgt[2] = fast_decay_param;
         tgt[3] = long_decay_param;
     }
 
     void params_fetch_default(uint16_t *tgt) const override {
         tgt[0] = DEFAULT_FREQUENCY;
-        tgt[1] = DEFAULT_DELAY;
+        tgt[1] = DEFAULT_RESONANCE;
         tgt[2] = DEFAULT_FAST_DECAY;
         tgt[3] = DEFAULT_LONG_DECAY;
     }
 
     void params_set(uint16_t *params) override {
         set_frequency(params[0]);
-        set_delay(params[1]);
+        set_resonance(params[1]);
         set_fast_decay(params[2]);
         set_long_decay(params[3]);
     }
@@ -1028,9 +1018,9 @@ public:
         vca_filter_.set_frequency(frequency >> 2);
     }
 
-    void set_delay(uint16_t delay) {
-        delay_param = delay;
-        vca_envelope_.set_delay(delay >> 6);
+    void set_resonance(uint16_t frequency) {
+        resonance_param = frequency;
+        vca_filter_.set_resonance(frequency >> 2);
     }
 
     void set_fast_decay(uint16_t decay) {
@@ -1047,7 +1037,7 @@ private:
     Repeater vca_envelope_;
     Svf vca_filter_;
 
-    uint16_t freq_param, delay_param;
+    uint16_t freq_param, resonance_param;
     uint16_t fast_decay_param, long_decay_param;
 
 };
