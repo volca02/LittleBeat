@@ -94,7 +94,13 @@ public:
         counter_ = delay_ + 1;
     }
 
+    // done - as observed by the counter
     bool done() { return counter_ == 0; }
+
+    // finished - as in delay passed and excitation went to zero
+    bool finished() {
+        return state_ == 0 && counter_ == 0;
+    }
 
     inline int32_t Process() {
         state_ = (state_ * decay_ >> 12);
@@ -113,6 +119,68 @@ private:
     int32_t counter_;
     int32_t state_;
     int32_t level_;
+};
+
+// repeated excitation. N counts, then longer decay
+class Repeater {
+public:
+    Repeater() {}
+    ~Repeater() {}
+
+    void Init() {
+        delay_ = 1.0e-3*48000;
+        counter_ = 0;
+        decay_ = 3340;
+        decay_term_ = 4095;
+
+        ex_.Init();
+        ex_.set_delay(0);
+        ex_.set_decay(decay_);
+    }
+
+    void Trigger(int32_t level) {
+        rep_counter_ = 0;
+        counter_     = delay_;
+        level_       = level;
+        ex_.set_decay(decay_);
+        ex_.Trigger(level_);
+    }
+
+    inline int32_t Process() {
+        // TODO: transition to Decay-Only repeat (via exc.finished())
+        int32_t exc = ex_.Process();
+        if (counter_ > 0) {
+            --counter_;
+            if (counter_ == 0) {
+                ++rep_counter_;
+                if (rep_counter_ == repeats_) {
+                    ex_.set_decay(decay_term_);
+                    ex_.Trigger(level_);
+                } else {
+                    counter_ = delay_;
+                    ex_.Trigger(level_);
+                }
+            }
+        }
+
+        return exc;
+    }
+
+    void set_repeats(uint32_t repeats) { repeats_ = repeats; }
+    void set_delay(uint32_t delay) { delay_ = delay; }
+    void set_decay(uint32_t decay) { decay_ = decay; }
+    void set_decay_term(uint32_t decay) { decay_term_ = decay; }
+
+private:
+    Excitation ex_;
+
+    uint32_t level_;  // level for re-trigger
+    uint32_t delay_;  // delay of each initial pulse
+    uint32_t counter_;
+    int32_t rep_counter_; // counts down the initial pulses (repeats_ to zero)
+    uint32_t decay_;
+    uint32_t decay_term_;
+    uint32_t repeats_;
 };
 
 enum SvfMode { SVF_MODE_LP, SVF_MODE_BP, SVF_MODE_HP };
@@ -880,5 +948,108 @@ private:
     uint16_t freq_param, fm_param, decay_param, noise_param;
 };
 
+class Clap : public Configurable {
+public:
+    Clap() {};
+    ~Clap() {};
+
+    constexpr static uint16_t DEFAULT_FREQUENCY     = 42976;
+    constexpr static uint16_t DEFAULT_DELAY         = 36864;
+    constexpr static uint16_t DEFAULT_FAST_DECAY    = 35584;
+    constexpr static uint16_t DEFAULT_LONG_DECAY    = 49151;
+
+    void Init() {
+        vca_envelope_.Init();
+        vca_envelope_.set_repeats(2);
+
+        set_fast_decay(DEFAULT_FAST_DECAY);
+        set_long_decay(DEFAULT_LONG_DECAY);
+        set_delay(DEFAULT_DELAY);
+
+        vca_filter_.Init();
+        vca_filter_.set_resonance(1000);
+        vca_filter_.set_mode(SVF_MODE_BP);
+        set_frequency(DEFAULT_FREQUENCY);
+    }
+
+    int16_t ProcessSingleSample(uint8_t control) {
+        if (control & CONTROL_GATE_RISING) {
+            // TODO: Set this properly!
+            vca_envelope_.Trigger(32768 * 15);
+        }
+
+        int16_t noise = Random::GetSample();
+
+        int32_t filtered_noise = 0;
+        filtered_noise += vca_filter_.Process(noise);
+        filtered_noise += vca_filter_.Process(noise);
+
+        int32_t envelope = vca_envelope_.Process() >> 4;
+        int32_t vca_noise = envelope * filtered_noise >> 14;
+
+        vca_noise = CLIP(vca_noise);
+        return vca_noise;
+    }
+
+    unsigned param_count() const override { return 4; }
+    const char *param_name(unsigned arg) const override {
+        switch (arg) {
+        case 0: return "Frequency";
+        case 1: return "Delay";
+        case 2: return "Fast Decay";
+        case 3: return "Long Decay";
+        default: return "?";
+        }
+    }
+
+    void params_fetch_current(uint16_t *tgt) const override {
+        tgt[0] = freq_param;
+        tgt[1] = delay_param;
+        tgt[2] = fast_decay_param;
+        tgt[3] = long_decay_param;
+    }
+
+    void params_fetch_default(uint16_t *tgt) const override {
+        tgt[0] = DEFAULT_FREQUENCY;
+        tgt[1] = DEFAULT_DELAY;
+        tgt[2] = DEFAULT_FAST_DECAY;
+        tgt[3] = DEFAULT_LONG_DECAY;
+    }
+
+    void params_set(uint16_t *params) override {
+        set_frequency(params[0]);
+        set_delay(params[1]);
+        set_fast_decay(params[2]);
+        set_long_decay(params[3]);
+    }
+
+    void set_frequency(uint16_t frequency) {
+        freq_param = frequency;
+        vca_filter_.set_frequency(frequency >> 2);
+    }
+
+    void set_delay(uint16_t delay) {
+        delay_param = delay;
+        vca_envelope_.set_delay(delay >> 6);
+    }
+
+    void set_fast_decay(uint16_t decay) {
+        fast_decay_param = decay;
+        vca_envelope_.set_decay(4032 + (decay >> 10));
+    }
+
+    void set_long_decay(uint16_t decay) {
+        long_decay_param = decay;
+        vca_envelope_.set_decay_term(4092 + (decay >> 14));
+    }
+
+private:
+    Repeater vca_envelope_;
+    Svf vca_filter_;
+
+    uint16_t freq_param, delay_param;
+    uint16_t fast_decay_param, long_decay_param;
+
+};
 
 } // end namespace peaks

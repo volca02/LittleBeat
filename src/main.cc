@@ -43,6 +43,9 @@ void handleNoteOn(byte inChannel, byte inNote, byte inVelocity)
     case ACCOUSTIC_SNARE:
         drummer.trigger(Drummer::SNARE, inVelocity);
         return;
+    case HAND_CLAP:
+        drummer.trigger(Drummer::CLAP, inVelocity);
+        return;
     case ELECTRIC_SNARE:
         drummer.trigger(Drummer::FM, inVelocity);
         break;
