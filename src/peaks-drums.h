@@ -1,5 +1,9 @@
 #pragma once
 
+#include <Arduino.h>
+
+#include "lut.h"
+
 namespace peaks {
 
 // Note: Have to change this if there ever comes a percussion with more
@@ -24,59 +28,9 @@ enum ControlBitMask {
 
 enum ControlMode { CONTROL_MODE_FULL, CONTROL_MODE_HALF };
 
-const uint16_t lut_svf_cutoff[] = {
-    35,    37,    39,    41,    44,    46,    49,    52,    55,    58,    62,
-    66,    70,    74,    78,    83,    88,    93,    99,    105,   111,   117,
-    124,   132,   140,   148,   157,   166,   176,   187,   198,   210,   222,
-    235,   249,   264,   280,   297,   314,   333,   353,   374,   396,   420,
-    445,   471,   499,   529,   561,   594,   629,   667,   706,   748,   793,
-    840,   890,   943,   999,   1059,  1122,  1188,  1259,  1334,  1413,  1497,
-    1586,  1681,  1781,  1886,  1999,  2117,  2243,  2377,  2518,  2668,  2826,
-    2994,  3172,  3361,  3560,  3772,  3996,  4233,  4485,  4751,  5033,  5332,
-    5648,  5983,  6337,  6713,  7111,  7532,  7978,  8449,  8949,  9477,  10037,
-    10628, 11254, 11916, 12616, 13356, 14138, 14964, 15837, 16758, 17730, 18756,
-    19837, 20975, 22174, 23435, 24761, 25078, 25078, 25078, 25078, 25078, 25078,
-    25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078,
-    25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078,
-    25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078,
-    25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078,
-    25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078,
-    25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078,
-    25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078,
-    25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078,
-    25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078,
-    25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078,
-    25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078,
-    25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078, 25078,
-    25078, 25078, 25078, 25078,
-};
-
-const uint16_t lut_svf_damp[] = {
-    65534, 49166, 46069, 43993, 42386, 41058, 39917, 38910, 38007, 37184, 36427,
-    35726, 35070, 34454, 33873, 33322, 32798, 32299, 31820, 31361, 30920, 30496,
-    30086, 29690, 29306, 28935, 28574, 28224, 27883, 27551, 27228, 26912, 26605,
-    26304, 26010, 25723, 25441, 25166, 24896, 24631, 24371, 24116, 23866, 23620,
-    23379, 23141, 22908, 22678, 22452, 22229, 22010, 21794, 21581, 21371, 21164,
-    20960, 20759, 20560, 20365, 20171, 19980, 19791, 19605, 19421, 19239, 19059,
-    18882, 18706, 18532, 18360, 18190, 18022, 17856, 17691, 17528, 17367, 17207,
-    17049, 16892, 16737, 16583, 16431, 16280, 16131, 15982, 15836, 15690, 15546,
-    15403, 15261, 15120, 14981, 14843, 14705, 14569, 14434, 14300, 14167, 14036,
-    13905, 13775, 13646, 13518, 13391, 13265, 13140, 13015, 12892, 12769, 12648,
-    12527, 12407, 12287, 12169, 12051, 11934, 11818, 11703, 11588, 11474, 11361,
-    11249, 11137, 11026, 10915, 10805, 10696, 10588, 10480, 10373, 10266, 10160,
-    10055, 9950,  9846,  9742,  9639,  9537,  9435,  9333,  9233,  9132,  9033,
-    8933,  8835,  8737,  8639,  8542,  8445,  8349,  8253,  8158,  8063,  7969,
-    7875,  7782,  7689,  7596,  7504,  7413,  7321,  7231,  7140,  7050,  6961,
-    6872,  6783,  6695,  6607,  6519,  6432,  6346,  6259,  6173,  6088,  6003,
-    5918,  5833,  5749,  5665,  5582,  5499,  5416,  5334,  5251,  5170,  5088,
-    5007,  4926,  4846,  4766,  4686,  4607,  4527,  4449,  4370,  4292,  4214,
-    4136,  4059,  3982,  3905,  3828,  3752,  3676,  3601,  3525,  3450,  3375,
-    3301,  3226,  3152,  3078,  3005,  2932,  2859,  2786,  2713,  2641,  2569,
-    2497,  2426,  2355,  2284,  2213,  2142,  2072,  2002,  1932,  1862,  1793,
-    1724,  1655,  1586,  1518,  1449,  1381,  1313,  1246,  1178,  1111,  1044,
-    977,   911,   844,   778,   712,   647,   581,   516,   450,   385,   321,
-    256,   192,   127,   63,
-};
+const uint16_t kHighestNote = 128 * 128;
+const uint16_t kPitchTableStart = 116 * 128;
+const uint16_t kOctave = 128 * 12;
 
 static inline int32_t CLIP(int32_t sample) {
     if (sample < -32768)
@@ -103,6 +57,20 @@ inline int16_t Interpolate824(const uint8_t *table, uint32_t phase) {
     int32_t b = table[(phase >> 24) + 1];
     return (a << 8) + ((b - a) * static_cast<int32_t>(phase & 0xffffff) >> 16) -
            32768;
+}
+
+inline int16_t Interpolate1022(const int16_t* table, uint32_t phase) {
+  int32_t a = table[phase >> 22];
+  int32_t b = table[(phase >> 22) + 1];
+  return a + ((b - a) * static_cast<int32_t>((phase >> 6) & 0xffff) >> 16);
+}
+
+inline int16_t Mix(int16_t a, int16_t b, uint16_t balance) {
+  return (a * (65535 - balance) + b * balance) >> 16;
+}
+
+inline uint16_t Mix(uint16_t a, uint16_t b, uint16_t balance) {
+  return (a * (65535 - balance) + b * balance) >> 16;
 }
 
 class Excitation {
@@ -686,5 +654,232 @@ public:
     uint16_t closed_decay_param = DEFAULT_CLOSED_DECAY,
              open_decay_param = DEFAULT_OPEN_DECAY;
 };
+
+class FmDrum : public Configurable {
+public:
+    constexpr static int16_t  DEFAULT_FREQUENCY = 31744;
+    constexpr static uint16_t DEFAULT_FM        = 19456;
+    constexpr static uint16_t DEFAULT_DECAY     = 31744;
+    constexpr static uint16_t DEFAULT_NOISE     = 51199;
+
+    FmDrum() { }
+    ~FmDrum() { }
+
+    void Init() {
+        step_  = 0;
+        phase_ = 0;
+        fm_envelope_phase_ = 0xffffffff;
+        am_envelope_phase_ = 0xffffffff;
+        previous_sample_ = 0;
+
+        set_frequency(DEFAULT_FREQUENCY);
+        set_fm_amount(DEFAULT_FM);
+        set_decay(DEFAULT_DECAY);
+        set_noise(DEFAULT_NOISE);
+    }
+
+    int16_t ProcessSingleSample(uint8_t control) {
+        if (control & CONTROL_GATE_RISING) {
+            fm_envelope_phase_ = 0;
+            am_envelope_phase_ = 0;
+            aux_envelope_phase_ = 0;
+            phase_ = 0x3fff * fm_amount_ >> 16;
+            step_ = 0;
+        }
+
+        fm_envelope_phase_ += fm_envelope_increment_;
+        if (fm_envelope_phase_ < fm_envelope_increment_) {
+            fm_envelope_phase_ = 0xffffffff;
+        }
+
+        aux_envelope_phase_ += 4473924;
+
+        if (aux_envelope_phase_ < 4473924) {
+            aux_envelope_phase_ = 0xffffffff;
+        }
+
+        if ((step_ & 3) == 0) {
+            uint32_t aux_envelope = 65535 - Interpolate824(
+                    lut_env_expo, aux_envelope_phase_);
+            uint32_t fm_envelope = 65535 - Interpolate824(
+                    lut_env_expo, fm_envelope_phase_);
+            phase_increment_ = ComputePhaseIncrement(
+                    frequency_ + \
+                    (fm_envelope * fm_amount_ >> 16) + \
+                    (aux_envelope * aux_envelope_strength_ >> 15) + \
+                    (previous_sample_ >> 6));
+        }
+
+        phase_ += phase_increment_;
+
+        int16_t mix = Interpolate1022(wav_sine, phase_);
+        if (noise_) {
+            mix = Mix(mix, Random::GetSample(), noise_);
+        }
+
+        am_envelope_phase_ += am_envelope_increment_;
+        if (am_envelope_phase_ < am_envelope_increment_) {
+            am_envelope_phase_ = 0xffffffff;
+        }
+
+        uint32_t am_envelope =
+            65535 - Interpolate824(lut_env_expo, am_envelope_phase_);
+
+        mix = (((int32_t)mix) * am_envelope) >> 16;
+
+        if (overdrive_) {
+            uint32_t phi = (static_cast<int32_t>(mix) << 16) + (1L << 31);
+            int16_t overdriven = Interpolate1022(wav_overdrive, phi);
+            mix = Mix(mix, overdriven, overdrive_);
+        }
+
+        step_++;
+        previous_sample_ = mix;
+        return mix;
+    }
+
+    void Morph(uint16_t x, uint16_t y) {
+        const uint16_t (*map)[4] = sd_range_ ? sd_map : bd_map;
+        uint16_t parameters[4];
+        for (uint8_t i = 0; i < 4; ++i) {
+            uint16_t x_integral = (x >> 14) << 1;
+            uint16_t x_fractional = x << 2;
+            uint16_t a = map[x_integral][i];
+            uint16_t b = map[x_integral + 2][i];
+            uint16_t c = map[x_integral + 1][i];
+            uint16_t d = map[x_integral + 3][i];
+
+            uint16_t e = a + ((b - a) * x_fractional >> 16);
+            uint16_t f = c + ((d - c) * x_fractional >> 16);
+            parameters[i] = e + ((f - e) * y >> 16);
+        }
+    }
+
+    unsigned param_count() const override { return 4; }
+
+    const char *param_name(unsigned arg) const override {
+        switch (arg) {
+        case 0: return "Frequency";
+        case 1: return "FM Amount";
+        case 2: return "Decay";
+        case 3: return "Noise";
+        default: return "?";
+        }
+    }
+
+    void params_fetch_current(uint16_t *tgt) const override {
+        tgt[0] = freq_param;
+        tgt[1] = fm_param;
+        tgt[2] = decay_param;
+        tgt[3] = noise_param;
+    }
+
+    void params_fetch_default(uint16_t *tgt) const override {
+        tgt[0] = DEFAULT_FREQUENCY;
+        tgt[1] = DEFAULT_FM;
+        tgt[2] = DEFAULT_DECAY;
+        tgt[3] = DEFAULT_NOISE;
+    }
+
+    void params_set(uint16_t *params) override {
+        set_frequency(params[0]);
+        set_fm_amount(params[1]);
+        set_decay(params[2]);
+        set_noise(params[3]);
+    }
+
+    inline void set_sd_range(bool sd_range) {
+        sd_range_ = sd_range;
+    }
+
+    inline void set_frequency(uint16_t frequency) {
+        freq_param = frequency;
+        if (frequency <= 16384) {
+            aux_envelope_strength_ = 1024;
+        } else if (frequency <= 32768) {
+            aux_envelope_strength_ = 2048 - (frequency >> 4);
+        } else {
+            aux_envelope_strength_ = 0;
+        }
+        frequency_ = (24 << 7) + ((72 << 7) * frequency >> 16);
+    }
+
+    inline void set_fm_amount(uint16_t fm_amount) {
+        fm_param = fm_amount;
+        // NOTE: original had another >> 2 *3
+        fm_amount_ = (fm_amount >> 2);
+    }
+
+    inline void set_decay(uint16_t decay) {
+        decay_param = decay;
+        am_decay_ = 16384 + (decay >> 1);
+        fm_decay_ = 8192 + (decay >> 2);
+        am_envelope_increment_ = ComputeEnvelopeIncrement(am_decay_);
+        fm_envelope_increment_ = ComputeEnvelopeIncrement(fm_decay_);
+    }
+
+    inline void set_noise(uint16_t noise) {
+        noise_param = noise;
+        uint32_t n = noise;
+        noise_ = noise >= 32768 ? ((n - 32768) * (n - 32768) >> 15) : 0;
+        noise_ = (noise_ >> 2) * 5;
+        overdrive_ = noise <= 32767 ? ((32767 - n) * (32767 - n) >> 14) : 0;
+    }
+
+private:
+    bool sd_range_;
+
+    uint32_t ComputePhaseIncrement(int16_t midi_pitch) {
+        if (midi_pitch >= kHighestNote) {
+            midi_pitch = kHighestNote - 1;
+        }
+
+        int32_t ref_pitch = midi_pitch;
+        ref_pitch -= kPitchTableStart;
+
+        size_t num_shifts = 0;
+        while (ref_pitch < 0) {
+            ref_pitch += kOctave;
+            ++num_shifts;
+        }
+
+        uint32_t a = lut_oscillator_increments[ref_pitch >> 4];
+        uint32_t b = lut_oscillator_increments[(ref_pitch >> 4) + 1];
+        uint32_t phase_increment = a + \
+                                   (static_cast<int32_t>(b - a) * (ref_pitch & 0xf) >> 4);
+        phase_increment >>= num_shifts;
+        return phase_increment;
+    }
+
+    uint32_t ComputeEnvelopeIncrement(uint16_t decay) {
+        // Interpolate the two neighboring values of the env_increments table
+        uint32_t a = lut_env_increments[decay >> 8];
+        uint32_t b = lut_env_increments[(decay >> 8) + 1];
+        return a - ((a - b) * (decay & 0xff) >> 8);
+    }
+
+    uint16_t aux_envelope_strength_;
+    uint16_t frequency_;
+    uint16_t fm_amount_;
+    uint16_t am_decay_;
+    uint16_t fm_decay_;
+
+    uint32_t am_envelope_increment_;
+    uint32_t fm_envelope_increment_;
+
+    uint16_t noise_;
+    uint16_t overdrive_;
+    int16_t previous_sample_;
+
+    uint32_t phase_;
+    uint32_t step_;
+    uint32_t fm_envelope_phase_;
+    uint32_t am_envelope_phase_;
+    uint32_t aux_envelope_phase_;
+    uint32_t phase_increment_;
+
+    uint16_t freq_param, fm_param, decay_param, noise_param;
+};
+
 
 } // end namespace peaks

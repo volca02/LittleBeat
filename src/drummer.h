@@ -16,13 +16,15 @@ public:
         BASS_DRUM = 0,
         SNARE,
         HIHAT_CLOSED,
-        HIHAT_OPEN
+        HIHAT_OPEN,
+        FM
     };
 
     void init() {
         bass.Init();
         snare.Init();
         high_hat.Init();
+        fm.Init();
 
         //initialize i2s with configurations above
         i2s_driver_install((i2s_port_t)i2s_num, &i2s_config, 0, NULL);
@@ -47,6 +49,10 @@ public:
             high_hat.set_open(true);
             high_hat_trigger = peaks::CONTROL_GATE_RISING;
             break;
+        case FM:
+            fm_is_accented = accent(velocity);
+            fm_trigger = peaks::CONTROL_GATE_RISING;
+            break;
         }
     }
 
@@ -60,7 +66,7 @@ public:
 
     /** percussion sound counter. Some are deduplicated (i.e. hihat) */
     unsigned percussion_count() const {
-        return 3;
+        return 4;
     }
 
     /** returns name of the given percussion index */
@@ -69,6 +75,7 @@ public:
         case 0: return "Bass Drum";
         case 1: return "Snare Drum";
         case 2: return "Hi-Hat";
+        case 3: return "FM Drum";
         default: return nullptr;
         }
     }
@@ -79,6 +86,7 @@ public:
         case 0: return &bass;
         case 1: return &snare;
         case 2: return &high_hat;
+        case 3: return &fm;
         default:
             return nullptr;
         }
@@ -90,24 +98,24 @@ protected:
         int32_t b = bass.ProcessSingleSample(bass_trigger) >> 2;
         int32_t s = snare.ProcessSingleSample(snare_trigger) >> 2;
         int32_t h = high_hat.ProcessSingleSample(high_hat_trigger) >> 2;
+        int32_t f = fm.ProcessSingleSample(fm_trigger) >> 2;
 
         if (bass_is_accented) b <<= 1;
         if (snare_is_accented) s <<= 1;
         if (high_hat_is_accented) h <<= 1;
+        if (fm_is_accented) f <<= 1;
 
         bass_trigger = peaks::CONTROL_GATE;
         snare_trigger = peaks::CONTROL_GATE;
         high_hat_trigger = peaks::CONTROL_GATE;
+        fm_trigger = peaks::CONTROL_GATE;
 
-        *left_sample = peaks::CLIP(b + s + h);
-        *right_sample = peaks::CLIP(b + s + h);
+        *left_sample = peaks::CLIP(b + s + h + f);
+        *right_sample = peaks::CLIP(b + s + h + f);
     }
 
     /* write sample data to I2S */
     bool i2s_write_sample_nb(uint32_t sample) {
-        /*    size_t wtn = 0;
-      i2s_write((i2s_port_t)i2s_num, &sample, sizeof(uint32_t), &wtn, 100);
-      return wtn == sizeof(uint32_t);*/
         return i2s_write_bytes((i2s_port_t)i2s_num, &sample, sizeof(uint32_t), 100);
     }
 
@@ -125,12 +133,15 @@ protected:
     bool bass_is_accented = false;
     bool snare_is_accented = false;
     bool high_hat_is_accented = false;
+    bool fm_is_accented = false;
 
     peaks::ControlBitMask bass_trigger;
     peaks::ControlBitMask snare_trigger;
     peaks::ControlBitMask high_hat_trigger;
+    peaks::ControlBitMask fm_trigger;
 
     peaks::BassDrum bass;
     peaks::SnareDrum snare;
     peaks::HighHat high_hat;
+    peaks::FmDrum fm;
 };
