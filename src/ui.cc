@@ -180,7 +180,10 @@ void ParamScreen::draw() {
     int sl = strlen(str_val);
     str_val[sl] = '%';
     str_val[sl + 1] = 0;
+
+    display.setTextAlignment(TEXT_ALIGN_CENTER);
     display.drawString(64, 50, str_val);
+    display.setTextAlignment(TEXT_ALIGN_LEFT);
 
     display.display();
 }
