@@ -985,7 +985,7 @@ public:
     const char *param_name(unsigned arg) const override {
         switch (arg) {
         case 0: return "Frequency";
-        case 1: return "Resoncance";
+        case 1: return "Resonance";
         case 2: return "Fast Decay";
         case 3: return "Long Decay";
         default: return "?";
@@ -1025,7 +1025,7 @@ public:
 
     void set_fast_decay(uint16_t decay) {
         fast_decay_param = decay;
-        vca_envelope_.set_decay(4032 + (decay >> 10));
+        vca_envelope_.set_decay(3968 + (decay >> 9));
     }
 
     void set_long_decay(uint16_t decay) {
