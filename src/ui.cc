@@ -79,7 +79,9 @@ void PercussionScreen::draw() {
 
     display.clear();
     display.setFont(ArialMT_Plain_10);
-    if (drum_name) display.drawString(5, 5, drum_name);
+
+    if (drum_name) display.drawString(0, 0, drum_name);
+    display.drawLine(0, 12, w, 12);
 
     // TODO: get all drum params and render them
     // TODO: With two rotencoders we could directly influnence the parameters
@@ -160,7 +162,8 @@ void ParamScreen::draw() {
 
     display.clear();
     display.setFont(ArialMT_Plain_10);
-    display.drawString(5, 5, name);
+    display.drawString(0, 0, name);
+    display.drawLine(0, 12, w, 12);
     display.drawString(5, 20, percussion->param_name(index));
 
     // render the parameter value
