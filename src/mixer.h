@@ -3,6 +3,7 @@
 #include <Arduino.h>
 
 #include "peaks-drums.h"
+#include "fx-echo.h"
 
 class Mixer {
 public:
@@ -23,6 +24,7 @@ public:
     struct ChannelSettings {
         uint16_t volume = VOL_MAX; // max volume, we shift to avoid clipping
         uint16_t panning = 32768; // panning, 32768 is center
+        uint16_t fx      = 0;     // fx send
     };
 
     // values set by the playback, not directly configurable
@@ -73,6 +75,7 @@ public:
     // mixes all samples according to settings and values
     void mix(int16_t *left, int16_t *right) {
         int32_t lt = 0, rt = 0;
+        int32_t flt = 0, frt = 0;
 
         for (unsigned chan = 0; chan < CHANNEL_MAX; ++chan) {
             // first we mix up the final sample volume
@@ -82,12 +85,27 @@ public:
                 ) >> 16;
             // now we pan it left/right
             int32_t pan = settings[chan].panning;
-            lt += mixed * pan >> 16;
-            rt += mixed * (65535 - pan) >> 16;
+
+            int16_t l = mixed * pan >> 16;
+            int16_t r = mixed * (65535 - pan) >> 16;
+
+            // mix to main
+            lt += l;
+            rt += r;
+
+            // mix to fx
+            flt += l * settings[chan].fx >> 16;
+            frt += r * settings[chan].fx >> 16;
         }
 
-        *left  = peaks::CLIP(lt);
-        *right = peaks::CLIP(rt);
+        // process and mix-in the FX
+        int16_t fx_l = peaks::CLIP(flt);
+        int16_t fx_r = peaks::CLIP(frt);
+
+        echo.Process(fx_l, fx_r);
+
+        *left  = peaks::CLIP(lt + fx_l);
+        *right = peaks::CLIP(rt + fx_r);
     }
 
 
@@ -95,4 +113,6 @@ protected:
 
     ChannelSettings settings[CHANNEL_MAX];
     ChannelStatus   status[CHANNEL_MAX];
+
+    Echo echo;
 };

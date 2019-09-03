@@ -119,7 +119,7 @@ protected:
     void modify_current_setting(int increment);
 
     // this is volume+panning. If other option gets added we have to increase this
-    static constexpr int SUBCHOICE_COUNT = 2;
+    static constexpr int SUBCHOICE_COUNT = 3;
 
     int idx_max;
     int index = 0;

@@ -322,6 +322,10 @@ void MixerScreen::modify_current_setting(int increment) {
         if (increment > 0) safe_incr(chs.panning);
         if (increment < 0) safe_decr(chs.panning);
         break;
+    case 2:
+        if (increment > 0) safe_incr(chs.fx);
+        if (increment < 0) safe_decr(chs.fx);
+        break;
     }
 }
 
@@ -353,6 +357,8 @@ void MixerScreen::draw() {
     draw_gauge(display, 64, 17, 60, 8, chs.volume, set_mode && sub_choice == 0);
     display.drawString(10, 30, "Panning");
     draw_gauge(display, 64, 32, 60, 8, chs.panning, set_mode && sub_choice == 1);
+    display.drawString(10, 45, "FX Send");
+    draw_gauge(display, 64, 47, 60, 8, chs.fx, set_mode && sub_choice == 2);
 
 
     display.display();
