@@ -9,6 +9,9 @@ class UI;
 
 using Display = SH1106Spi;
 
+// all screen types
+enum ScreenType { ST_MAIN, ST_PERC, ST_MIXER, ST_PARAM };
+
 namespace peaks {
 class Configurable;
 } // namespace peaks
@@ -39,6 +42,32 @@ protected:
     Display &display;
 };
 
+// main status screen. should later show midi channel, note status... currently only menu
+class MainScreen : public UIScreen {
+public:
+    struct Choice {
+        ScreenType screen;
+        const char *text;
+    };
+
+    static constexpr unsigned CHOICE_COUNT = 3;
+    static const Choice choices[CHOICE_COUNT];
+
+    MainScreen(UI &ui) : UIScreen(ui) {}
+
+    void onKey(KeyType key) override;
+
+    void draw() override;
+
+    void set_index(int idx) {
+        index = idx < CHOICE_COUNT ? idx : 0;
+        mark_dirty();
+    }
+
+protected:
+    int index = 0;
+};
+
 // For now this is a percussion selection screen
 class PercussionScreen : public UIScreen {
 public:
@@ -51,10 +80,14 @@ protected:
     int index = 0;
 };
 
-// parameter selector
+// parameter selector/modifier for drums
 class ParamScreen : public UIScreen {
 public:
-    ParamScreen(UI &ui) : UIScreen(ui) {}
+    ParamScreen(UI &ui) : UIScreen(ui) {
+        // be sure to have precussion set...
+        set_percussion(0);
+    }
+
     void onKey(KeyType key) override;
     void draw() override;
 
@@ -69,15 +102,38 @@ protected:
     bool set_mode; // if true, we're setting the parameter, not selecting one
 };
 
+class MixerScreen : public UIScreen {
+public:
+    MixerScreen(UI &ui);
+
+    void onKey(KeyType key) override;
+
+    void draw() override;
+
+    void set_index(int idx) {
+        index = idx;
+        mark_dirty();
+    }
+
+protected:
+    void modify_current_setting(int increment);
+
+    // this is volume+panning. If other option gets added we have to increase this
+    static constexpr int SUBCHOICE_COUNT = 2;
+
+    int idx_max;
+    int index = 0;
+    bool set_mode = false;
+};
+
 class UI {
 public:
-    enum ScreenType { ST_PERC, ST_PARAM };
-
     UI(Drummer &drummer, byte key, byte s1, byte s2, byte back, byte rst, byte dc)
         : drummer(drummer), display(rst, dc, /*unused*/ 0), key(key), s1(s1),
-          s2(s2), back(back), scrPerc(*this), scrParam(*this)
+          s2(s2), back(back), scrMain(*this), scrPerc(*this), scrParam(*this),
+          scrMixer(*this)
     {
-        active_screen = &scrPerc;
+        active_screen = &scrMain;
     }
 
     void init() {
@@ -124,19 +180,17 @@ public:
     }
 
     void set_screen(ScreenType st) {
-        switch (st) {
-        case ST_PERC: active_screen = &scrPerc; break;
-        case ST_PARAM: active_screen = &scrParam; break;
-        default: break;
-        }
-
+        UIScreen *new_scr = get_screen(st);
+        if (new_scr) active_screen = new_scr;
         if (active_screen) active_screen->mark_dirty();
     }
 
     UIScreen *get_screen(ScreenType st) {
         switch (st) {
-        case ST_PERC: return &scrPerc;
+        case ST_MAIN:  return &scrMain;
+        case ST_PERC:  return &scrPerc;
         case ST_PARAM: return &scrParam;
+        case ST_MIXER: return &scrMixer;
         default: return nullptr;
         }
     }
@@ -177,7 +231,10 @@ protected:
     EasyButton s2;
     EasyButton back;
 
+    MainScreen scrMain;
     PercussionScreen scrPerc;
     ParamScreen scrParam;
+    MixerScreen scrMixer;
+
     UIScreen *active_screen;
 };

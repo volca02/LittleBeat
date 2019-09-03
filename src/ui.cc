@@ -26,6 +26,17 @@ void draw_gauge(Display &display, byte x, byte y, byte length, byte height,
     }
 }
 
+void draw_cursor_horizonal(Display &display, byte x, byte y) {
+    display.drawLine(x, y,
+                     x + CURSOR_SIZE, y + CURSOR_SIZE/2);
+
+    display.drawLine(x, y + CURSOR_SIZE,
+                     x + CURSOR_SIZE, y + CURSOR_SIZE/2);
+
+    display.drawLine(x, y,
+                     x, y + CURSOR_SIZE);
+}
+
 constexpr uint16_t ROTENCODER_STEP = 1024;
 
 /// safely increments the value by N steps
@@ -43,21 +54,83 @@ void safe_decr(uint16_t &tgt, uint16_t steps = ROTENCODER_STEP) {
         tgt = 0;
 }
 
+/// safely increments the value by N steps
+void safe_incr(int16_t &tgt, uint16_t steps = ROTENCODER_STEP) {
+    if (tgt <= (INT16_MAX - steps))
+        tgt+=steps;
+    else
+        tgt=INT16_MAX;
+}
+
+void safe_decr(int16_t &tgt, uint16_t steps = ROTENCODER_STEP) {
+    if (tgt >= INT16_MIN + steps)
+        tgt -= steps;
+    else
+        tgt = INT16_MIN;
+}
+
 } // namespace
 
 UIScreen::UIScreen(UI &ui) : ui(ui), display(ui.get_display()) {}
+
+const MainScreen::Choice MainScreen::choices[CHOICE_COUNT] = {
+    {ST_PERC,  "Percussions"},
+    {ST_PARAM, "Tuning"},
+    {ST_MIXER, "Mixer"},
+};
+
+void MainScreen::onKey(KeyType key) {
+    //
+    switch (key) {
+    case KT_UP: index++; break;
+    case KT_DOWN: index--; break;
+    case KT_PRESS:
+        // transition to the screen represented by the first
+        ui.set_screen(choices[index].screen);
+        return;
+    }
+
+    // wraparound
+    if (index < 0) index = CHOICE_COUNT - 1;
+    if (index >= CHOICE_COUNT) index = 0;
+
+    // schedule redraw
+    mark_dirty();
+}
+
+void MainScreen::draw() {
+    // display the drum name and all parameters
+    uint8_t w = display.getWidth();
+    uint8_t h = display.getHeight();
+
+    display.clear();
+    display.setFont(ArialMT_Plain_10);
+
+    display.drawString(0, 0, "Main Menu");
+    display.drawLine(0, 12, w, 12);
+
+    for (unsigned id = 0; id < CHOICE_COUNT; ++id) {
+        display.drawString(10, 15*(id+1), choices[id].text);
+    }
+
+    draw_cursor_horizonal(display, 3, 4 + 15*(index+1));
+
+    display.display();
+}
+
 
 void PercussionScreen::onKey(KeyType key) {
     //
     switch (key) {
     case KT_UP: index++; break;
     case KT_DOWN: index--; break;
+    case KT_BACK: ui.set_screen(ST_MAIN); break;
     case KT_PRESS:
         // transition to the parameter selection screen
         ParamScreen *ps =
-            static_cast<ParamScreen *>(ui.get_screen(UI::ST_PARAM));
+            static_cast<ParamScreen *>(ui.get_screen(ST_PARAM));
         ps->set_percussion(index);
-        ui.set_screen(UI::ST_PARAM);
+        ui.set_screen(ST_PARAM);
         return;
     }
 
@@ -127,7 +200,12 @@ void ParamScreen::onKey(KeyType key) {
     case KT_UP: incr = 1; break;
     case KT_DOWN: incr = -1; break;
     case KT_BACK:
-        ui.set_screen(UI::ST_PERC);
+        if (set_mode) {
+            set_mode = false;
+            mark_dirty();
+            return;
+        }
+        ui.set_screen(ST_PERC);
         break;
     case KT_PRESS:
         set_mode = !set_mode;
@@ -184,6 +262,98 @@ void ParamScreen::draw() {
     display.setTextAlignment(TEXT_ALIGN_CENTER);
     display.drawString(64, 50, str_val);
     display.setTextAlignment(TEXT_ALIGN_LEFT);
+
+    display.display();
+}
+
+MixerScreen::MixerScreen(UI &ui)
+    : UIScreen(ui), idx_max(Mixer::get_channel_count() * SUBCHOICE_COUNT) {}
+
+void MixerScreen::onKey(KeyType key) {
+    int incr = 0;
+
+    switch (key) {
+    case KT_UP: incr = 1; break;
+    case KT_DOWN: incr = -1; break;
+    case KT_BACK:
+        if (set_mode) {
+            set_mode = false;
+            mark_dirty();
+            return;
+        }
+
+        ui.set_screen(ST_MAIN);
+        break;
+    case KT_PRESS:
+        set_mode = !set_mode;
+        mark_dirty();
+        return;
+    }
+
+    if (set_mode) {
+        // modify current value
+        modify_current_setting(incr);
+    } else {
+        index += incr;
+
+        // wraparound
+        if (index < 0) index = idx_max - 1;
+        if (index >= idx_max) index = 0;
+    }
+
+    // schedule redraw
+    mark_dirty();
+}
+
+void MixerScreen::modify_current_setting(int increment) {
+    unsigned channel = index / SUBCHOICE_COUNT;
+    unsigned sub_choice = index % SUBCHOICE_COUNT;
+
+    Mixer::ChannelSettings &chs =
+        ui.get_drummer().get_mixer().get_channel_settings(
+            (Mixer::Channel)channel);
+
+    switch (sub_choice) {
+    case 0:
+        if (increment > 0) safe_incr(chs.volume);
+        if (increment < 0) safe_decr(chs.volume);
+        break;
+    case 1:
+        if (increment > 0) safe_incr(chs.panning);
+        if (increment < 0) safe_decr(chs.panning);
+        break;
+    }
+}
+
+void MixerScreen::draw() {
+    // display the drum name and all parameters
+    uint8_t w = display.getWidth();
+    uint8_t h = display.getHeight();
+
+    display.clear();
+    display.setFont(ArialMT_Plain_10);
+
+    display.drawString(0, 0, "Mixer");
+    display.drawLine(0, 12, w, 12);
+
+    unsigned channel = index / SUBCHOICE_COUNT;
+    unsigned sub_choice = index % SUBCHOICE_COUNT;
+    auto chan = (Mixer::Channel)channel;
+    Mixer::ChannelSettings &chs =
+        ui.get_drummer().get_mixer().get_channel_settings(
+            chan);
+
+    // add channel name to status line
+    display.drawString(64, 0, Mixer::get_channel_name(chan));
+
+    if (!set_mode) draw_cursor_horizonal(display, 3, 19 + sub_choice * 15);
+
+    // render the settings for current channel
+    display.drawString(10, 15, "Volume");
+    draw_gauge(display, 64, 17, 60, 8, chs.volume, set_mode && sub_choice == 0);
+    display.drawString(10, 30, "Panning");
+    draw_gauge(display, 64, 32, 60, 8, chs.panning, set_mode && sub_choice == 1);
+
 
     display.display();
 }

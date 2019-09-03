@@ -109,6 +109,10 @@ public:
         }
     }
 
+    Mixer &get_mixer() {
+        return mixer;
+    }
+
 protected:
     void next_sample(int16_t *left_sample, int16_t *right_sample)
     {
