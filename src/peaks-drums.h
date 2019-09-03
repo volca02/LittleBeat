@@ -965,7 +965,7 @@ public:
     int16_t ProcessSingleSample(uint8_t control) {
         if (control & CONTROL_GATE_RISING) {
             // TODO: Set this properly!
-            vca_envelope_.Trigger(32768 * 15);
+            vca_envelope_.Trigger(32768 * 13);
         }
 
         int16_t noise = Random::GetSample();

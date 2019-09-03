@@ -1,6 +1,7 @@
 #include <driver/i2s.h>
 
 #include "peaks-drums.h"
+#include "mixer.h"
 
 constexpr byte ACCENT_THRESHOLD = 110;
 
@@ -37,28 +38,34 @@ public:
         switch (percussion) {
         case BASS_DRUM:
             bass_is_accented = accent(velocity);
+            mixer.set_velocity(Mixer::BASS_DRUM, velocity);
             bass_trigger = peaks::CONTROL_GATE_RISING;
             break;
         case SNARE:
             snare_is_accented = accent(velocity);
+            mixer.set_velocity(Mixer::SNARE, velocity);
             snare_trigger = peaks::CONTROL_GATE_RISING;
             break;
         case HIHAT_CLOSED:
             high_hat_is_accented = accent(velocity);
+            mixer.set_velocity(Mixer::HI_HAT, velocity);
             high_hat.set_open(false);
             high_hat_trigger = peaks::CONTROL_GATE_RISING;
             break;
         case HIHAT_OPEN:
             high_hat_is_accented = accent(velocity);
+            mixer.set_velocity(Mixer::HI_HAT, velocity);
             high_hat.set_open(true);
             high_hat_trigger = peaks::CONTROL_GATE_RISING;
             break;
         case FM:
             fm_is_accented = accent(velocity);
+            mixer.set_velocity(Mixer::FM, velocity);
             fm_trigger = peaks::CONTROL_GATE_RISING;
             break;
         case CLAP:
             clap_is_accented = accent(velocity);
+            mixer.set_velocity(Mixer::CLAP, velocity);
             clap_trigger = peaks::CONTROL_GATE_RISING;
             break;
         }
@@ -105,26 +112,20 @@ public:
 protected:
     void next_sample(int16_t *left_sample, int16_t *right_sample)
     {
-        int32_t b = bass.ProcessSingleSample(bass_trigger) >> 3;
-        int32_t s = snare.ProcessSingleSample(snare_trigger) >> 3;
-        int32_t h = high_hat.ProcessSingleSample(high_hat_trigger) >> 3;
-        int32_t f = fm.ProcessSingleSample(fm_trigger) >> 3;
-        int32_t c = clap.ProcessSingleSample(clap_trigger) >> 3;
+        mixer[Mixer::BASS_DRUM] = bass.ProcessSingleSample(bass_trigger);
+        mixer[Mixer::SNARE]     = snare.ProcessSingleSample(snare_trigger);
+        mixer[Mixer::HI_HAT]    = high_hat.ProcessSingleSample(high_hat_trigger);
+        mixer[Mixer::FM]        = fm.ProcessSingleSample(fm_trigger);
+        mixer[Mixer::CLAP]      = clap.ProcessSingleSample(clap_trigger);
 
-        if (bass_is_accented) b <<= 1;
-        if (snare_is_accented) s <<= 1;
-        if (high_hat_is_accented) h <<= 1;
-        if (fm_is_accented) f <<= 1;
-        if (clap_is_accented) c <<= 1;
-
+        // reset triggers
         bass_trigger = peaks::CONTROL_GATE;
         snare_trigger = peaks::CONTROL_GATE;
         high_hat_trigger = peaks::CONTROL_GATE;
         fm_trigger = peaks::CONTROL_GATE;
         clap_trigger = peaks::CONTROL_GATE;
 
-        *left_sample = peaks::CLIP(b + s + h + f + c);
-        *right_sample = peaks::CLIP(b + s + h + f + c);
+        mixer.mix(left_sample, right_sample);
     }
 
     /* write sample data to I2S */
@@ -160,4 +161,7 @@ protected:
     peaks::HighHat high_hat;
     peaks::FmDrum fm;
     peaks::Clap clap;
+
+    // mixes the sounds
+    Mixer mixer;
 };
