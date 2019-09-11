@@ -165,7 +165,7 @@ void PercussionScreen::draw() {
     percussion->params_fetch_current(params);
 
     for (unsigned id = 0; id < pc; ++id) {
-        draw_gauge(display, 5, 25 + id * 7, 118, 5, params[id]);
+        draw_gauge(display, 5, 20 + id * 7, 118, 5, params[id]);
     }
 
     display.display();

@@ -15,6 +15,7 @@ public:
     // Percussion ID for triggering
     enum Percussion {
         BASS_DRUM = 0,
+        KICK_DRUM,
         SNARE,
         HIHAT_CLOSED,
         HIHAT_OPEN,
@@ -24,6 +25,7 @@ public:
 
     void init() {
         bass.Init();
+        kick.Init();
         snare.Init();
         high_hat.Init();
         fm.Init();
@@ -40,6 +42,11 @@ public:
             bass_is_accented = accent(velocity);
             mixer.set_velocity(Mixer::BASS_DRUM, velocity);
             bass_trigger = peaks::CONTROL_GATE_RISING;
+            break;
+        case KICK_DRUM:
+            kick_is_accented = accent(velocity);
+            mixer.set_velocity(Mixer::KICK_DRUM, velocity);
+            kick_trigger = peaks::CONTROL_GATE_RISING;
             break;
         case SNARE:
             snare_is_accented = accent(velocity);
@@ -81,17 +88,18 @@ public:
 
     /** percussion sound counter. Some are deduplicated (i.e. hihat) */
     unsigned percussion_count() const {
-        return 5;
+        return 6;
     }
 
     /** returns name of the given percussion index */
     const char *percussion_name(unsigned idx) const {
         switch(idx) {
         case 0: return "Bass Drum";
-        case 1: return "Snare Drum";
-        case 2: return "Hi-Hat";
-        case 3: return "FM Drum";
-        case 4: return "Clap";
+        case 1: return "Kick Drum";
+        case 2: return "Snare Drum";
+        case 3: return "Hi-Hat";
+        case 4: return "FM Drum";
+        case 5: return "Clap";
         default: return nullptr;
         }
     }
@@ -100,10 +108,11 @@ public:
     peaks::Configurable *get_percussion(unsigned idx) {
         switch(idx) {
         case 0: return &bass;
-        case 1: return &snare;
-        case 2: return &high_hat;
-        case 3: return &fm;
-        case 4: return &clap;
+        case 1: return &kick;
+        case 2: return &snare;
+        case 3: return &high_hat;
+        case 4: return &fm;
+        case 5: return &clap;
         default:
             return nullptr;
         }
@@ -117,6 +126,7 @@ protected:
     void next_sample(int16_t *left_sample, int16_t *right_sample)
     {
         mixer[Mixer::BASS_DRUM] = bass.ProcessSingleSample(bass_trigger);
+        mixer[Mixer::KICK_DRUM] = kick.ProcessSingleSample(kick_trigger);
         mixer[Mixer::SNARE]     = snare.ProcessSingleSample(snare_trigger);
         mixer[Mixer::HI_HAT]    = high_hat.ProcessSingleSample(high_hat_trigger);
         mixer[Mixer::FM]        = fm.ProcessSingleSample(fm_trigger);
@@ -124,6 +134,7 @@ protected:
 
         // reset triggers
         bass_trigger = peaks::CONTROL_GATE;
+        kick_trigger = peaks::CONTROL_GATE;
         snare_trigger = peaks::CONTROL_GATE;
         high_hat_trigger = peaks::CONTROL_GATE;
         fm_trigger = peaks::CONTROL_GATE;
@@ -149,18 +160,21 @@ protected:
     }
 
     bool bass_is_accented = false;
+    bool kick_is_accented = false;
     bool snare_is_accented = false;
     bool high_hat_is_accented = false;
     bool fm_is_accented = false;
     bool clap_is_accented = false;
 
     peaks::ControlBitMask bass_trigger;
+    peaks::ControlBitMask kick_trigger;
     peaks::ControlBitMask snare_trigger;
     peaks::ControlBitMask high_hat_trigger;
     peaks::ControlBitMask fm_trigger;
     peaks::ControlBitMask clap_trigger;
 
     peaks::BassDrum bass;
+    peaks::KickDrum kick;
     peaks::SnareDrum snare;
     peaks::HighHat high_hat;
     peaks::FmDrum fm;

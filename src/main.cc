@@ -27,6 +27,7 @@ void setup_drums()
 
 constexpr unsigned PERCUSSION_CHANNEL = 10;
 
+constexpr unsigned ACCOUSTIC_BASS_DRUM = 35;
 constexpr unsigned BASS_DRUM1 = 36;
 constexpr unsigned ACCOUSTIC_SNARE = 38;
 constexpr unsigned HAND_CLAP = 39;
@@ -37,8 +38,11 @@ constexpr unsigned OPEN_HIHAT = 46;
 void handleNoteOn(byte inChannel, byte inNote, byte inVelocity)
 {
     switch (inNote) {
-    case BASS_DRUM1:
+    case ACCOUSTIC_BASS_DRUM:
         drummer.trigger(Drummer::BASS_DRUM, inVelocity);
+        return;
+    case BASS_DRUM1:
+        drummer.trigger(Drummer::KICK_DRUM, inVelocity);
         return;
     case ACCOUSTIC_SNARE:
         drummer.trigger(Drummer::SNARE, inVelocity);

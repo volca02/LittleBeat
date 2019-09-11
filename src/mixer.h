@@ -9,6 +9,7 @@ class Mixer {
 public:
     enum Channel {
         BASS_DRUM = 0,
+        KICK_DRUM,
         SNARE,
         HI_HAT,
         FM,
@@ -48,6 +49,7 @@ public:
     static const char *get_channel_name(Channel arg) {
         switch (arg) {
         case BASS_DRUM: return "Bass Drum";
+        case KICK_DRUM: return "Kick Drum";
         case SNARE: return "Snare Drum";
         case HI_HAT: return "Hi-Hat";
         case FM: return "FM Drum";

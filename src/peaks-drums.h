@@ -8,7 +8,7 @@ namespace peaks {
 
 // Note: Have to change this if there ever comes a percussion with more
 // parameters
-const uint16_t PARAM_MAX = 4;
+const uint16_t PARAM_MAX = 6;
 
 // Code in this namespace is largerly based on Peaks source code.
 // https://github.com/pichenettes/eurorack
@@ -73,6 +73,28 @@ inline uint16_t Mix(uint16_t a, uint16_t b, uint16_t balance) {
   return (a * (65535 - balance) + b * balance) >> 16;
 }
 
+inline uint32_t ComputePhaseIncrement(int16_t midi_pitch) {
+    if (midi_pitch >= kHighestNote) {
+        midi_pitch = kHighestNote - 1;
+    }
+
+    int32_t ref_pitch = midi_pitch;
+    ref_pitch -= kPitchTableStart;
+
+    size_t num_shifts = 0;
+    while (ref_pitch < 0) {
+        ref_pitch += kOctave;
+        ++num_shifts;
+    }
+
+    uint32_t a = lut_oscillator_increments[ref_pitch >> 4];
+    uint32_t b = lut_oscillator_increments[(ref_pitch >> 4) + 1];
+    uint32_t phase_increment = a + \
+                               (static_cast<int32_t>(b - a) * (ref_pitch & 0xf) >> 4);
+    phase_increment >>= num_shifts;
+    return phase_increment;
+}
+
 class Excitation {
 public:
     Excitation() {}
@@ -90,8 +112,11 @@ public:
     void set_decay(uint16_t decay) { decay_ = decay; }
 
     void Trigger(int32_t level) {
-        level_ = level;
+        level_   = level;
         counter_ = delay_ + 1;
+        // this breaks the continuity of things, but without it bass drum
+        // repetitions break
+        state_   = 0;
     }
 
     // done - as observed by the counter
@@ -886,28 +911,6 @@ public:
 private:
     bool sd_range_;
 
-    uint32_t ComputePhaseIncrement(int16_t midi_pitch) {
-        if (midi_pitch >= kHighestNote) {
-            midi_pitch = kHighestNote - 1;
-        }
-
-        int32_t ref_pitch = midi_pitch;
-        ref_pitch -= kPitchTableStart;
-
-        size_t num_shifts = 0;
-        while (ref_pitch < 0) {
-            ref_pitch += kOctave;
-            ++num_shifts;
-        }
-
-        uint32_t a = lut_oscillator_increments[ref_pitch >> 4];
-        uint32_t b = lut_oscillator_increments[(ref_pitch >> 4) + 1];
-        uint32_t phase_increment = a + \
-                                   (static_cast<int32_t>(b - a) * (ref_pitch & 0xf) >> 4);
-        phase_increment >>= num_shifts;
-        return phase_increment;
-    }
-
     uint32_t ComputeEnvelopeIncrement(uint16_t decay) {
         // Interpolate the two neighboring values of the env_increments table
         uint32_t a = lut_env_increments[decay >> 8];
@@ -1040,6 +1043,191 @@ private:
     uint16_t freq_param, resonance_param;
     uint16_t fast_decay_param, long_decay_param;
 
+};
+
+/// 909-style kick synth
+class KickDrum : public Configurable {
+public:
+    KickDrum() {};
+    ~KickDrum() {};
+
+    constexpr static uint16_t DEFAULT_FREQUENCY     = 16000;
+    constexpr static uint16_t DEFAULT_TONE          = 36000;
+    constexpr static uint16_t DEFAULT_ATTACK        = 40000;
+    constexpr static uint16_t DEFAULT_DECAY         = 45535;
+    constexpr static uint16_t DEFAULT_OVERDRIVE     = 42384;
+    constexpr static uint16_t DEFAULT_TONE_DECAY    = 32767;
+
+    void Init() {
+        tone_envelope_.Init();
+        noise_envelope_.Init();
+        pg_gate_.Init();
+        ps_envelope_.Init();
+
+        noise_filter_.Init();
+        noise_filter_.set_resonance(36384);
+        noise_filter_.set_mode(SVF_MODE_LP);
+
+        set_frequency(DEFAULT_FREQUENCY);
+        set_attack(DEFAULT_ATTACK);
+        set_tone(DEFAULT_TONE);
+        set_decay(DEFAULT_DECAY);
+        set_overdrive(DEFAULT_OVERDRIVE);
+        set_tone_decay(DEFAULT_TONE_DECAY);
+    }
+
+    int16_t ProcessSingleSample(uint8_t control) {
+        if (control & CONTROL_GATE_RISING) {
+            tone_envelope_.Trigger(32768 * 128);
+            noise_envelope_.Trigger(32768 * 13);
+            pg_gate_.Trigger(0); // does not matter
+            ps_envelope_.Trigger(32768);
+            phase_ = 0;
+            state_ = 0;
+            phase_increment_ = 0;
+            tone_excitation_ = 0;
+        }
+
+        // ---- Noise --------------------------------------
+        int16_t noise = Random::GetSample();
+
+        pg_gate_.Process();
+
+        int32_t filtered_noise = 0;
+        filtered_noise += noise_filter_.Process(noise);
+        filtered_noise += noise_filter_.Process(noise);
+
+        // gate the noise
+        filtered_noise = filtered_noise * (pg_gate_.done() ? 0 : 1);
+
+        int32_t envelope = noise_envelope_.Process() >> 4;
+        int32_t vca_noise = envelope * filtered_noise >> 14;
+
+        // ---- Tone ---------------------------------------
+        if ((state_ & 0x03) == 0) {
+            // this makes the tone excitation 4x longer
+            tone_excitation_ = tone_envelope_.Process() >> 6;
+            pitch_sweep_     = ps_envelope_.Process();
+
+            phase_increment_ = ComputePhaseIncrement(
+                    frequency_
+                    + (frequency_ * (65535 - tone_decay_) >> 16)
+                    + (tone_decay_ * pitch_sweep_ >> 16));
+        }
+
+        state_++;
+
+        int16_t tone = Interpolate1022(wav_sine, phase_);
+
+        phase_ += phase_increment_;
+
+        int32_t vca_tone = tone_excitation_ * tone >> 15;
+
+        // ---- Mix ----------------------------------------
+        // TODO: Distort the tonal portion when applicable
+        // TODO: Delay for the tone_envelope trigger
+        int32_t mix = vca_noise + vca_tone;
+
+        if (overdrive_) {
+            uint32_t phi = (static_cast<int32_t>(mix) << 16) + (1L << 31);
+            int16_t overdriven = Interpolate1022(wav_overdrive, phi);
+            mix = Mix(mix, overdriven, overdrive_);
+        }
+
+        mix = CLIP(mix);
+        return mix;
+    }
+
+    unsigned param_count() const override { return 6; }
+    const char *param_name(unsigned arg) const override {
+        switch (arg) {
+        case 0: return "Frequency";
+        case 1: return "Tone";
+        case 2: return "Attack";
+        case 3: return "Decay";
+        case 4: return "Overdrive";
+        case 5: return "Tone Decay";
+        default: return "?";
+        }
+    }
+
+    void params_fetch_current(uint16_t *tgt) const override {
+        tgt[0] = freq_param;
+        tgt[1] = tone_param;
+        tgt[2] = attack_param;
+        tgt[3] = decay_param;
+        tgt[4] = overdrive_param;
+        tgt[5] = tone_decay_param;
+    }
+
+    void params_fetch_default(uint16_t *tgt) const override {
+        tgt[0] = DEFAULT_FREQUENCY;
+        tgt[1] = DEFAULT_TONE;
+        tgt[2] = DEFAULT_ATTACK;
+        tgt[3] = DEFAULT_DECAY;
+        tgt[3] = DEFAULT_OVERDRIVE;
+        tgt[3] = DEFAULT_TONE_DECAY;
+    }
+
+    void params_set(uint16_t *params) override {
+        set_frequency(params[0]);
+        set_tone(params[1]);
+        set_attack(params[2]);
+        set_decay(params[3]);
+        set_overdrive(params[4]);
+        set_tone_decay(params[5]);
+    }
+
+    void set_frequency(uint16_t freq) {
+        freq_param = freq;
+        frequency_ = (24 << 6) + ((72 << 5) * freq >> 16);
+    }
+
+    void set_tone(uint16_t tone) {
+        tone_param = tone;
+        noise_filter_.set_frequency(tone >> 2);
+    }
+
+    void set_attack(uint16_t attack) {
+        attack_param = attack;
+        pg_gate_.set_delay(attack >> 6);
+        noise_envelope_.set_decay(3968 + (attack >> 9));
+    }
+
+    void set_decay(uint16_t decay) {
+        decay_param = decay;
+        tone_envelope_.set_decay(4080 + (decay >> 12));
+        ps_envelope_.set_decay(4080 + (decay >> 12));
+    }
+
+    void set_overdrive(uint16_t overdrive) {
+        overdrive_param = overdrive;
+        overdrive_ = overdrive_param;
+    }
+
+    void set_tone_decay(uint16_t decay) {
+        tone_decay_param = decay;
+        tone_decay_ = decay >> 3;
+    }
+
+private:
+    Excitation tone_envelope_;  // envelope of the tonal part
+    Excitation noise_envelope_; // overall envelope of the kick
+    Excitation pg_gate_;    // gate for the noise
+    Excitation ps_envelope_;    // pitch sweep
+    Svf noise_filter_;  // this filters the noise part of the sound
+
+    // cached
+    uint32_t frequency_;
+    uint16_t overdrive_, tone_decay_;
+    int32_t pitch_sweep_;
+
+    // these are state variables, not parameters
+    uint32_t phase_, state_, phase_increment_;
+    int32_t tone_excitation_;
+
+    uint16_t freq_param, tone_param;
+    uint16_t attack_param, decay_param, overdrive_param, tone_decay_param;
 };
 
 } // end namespace peaks
