@@ -1060,13 +1060,15 @@ public:
 
     void Init() {
         tone_envelope_.Init();
-        noise_envelope_.Init();
-        pg_gate_.Init();
+        peak_envelope_.Init();
         ps_envelope_.Init();
 
-        noise_filter_.Init();
-        noise_filter_.set_resonance(36384);
-        noise_filter_.set_mode(SVF_MODE_LP);
+        // hardcoded
+        peak_envelope_.set_decay(4000);
+
+        peak_filter_.Init();
+        peak_filter_.set_resonance(36384);
+        peak_filter_.set_mode(SVF_MODE_LP);
 
         set_frequency(DEFAULT_FREQUENCY);
         set_attack(DEFAULT_ATTACK);
@@ -1078,9 +1080,8 @@ public:
 
     int16_t ProcessSingleSample(uint8_t control) {
         if (control & CONTROL_GATE_RISING) {
-            tone_envelope_.Trigger(32768 * 128);
-            noise_envelope_.Trigger(32768 * 13);
-            pg_gate_.Trigger(0); // does not matter
+            tone_envelope_.Trigger(32768 * 2);
+            peak_envelope_.Trigger(32768 * 6);
             ps_envelope_.Trigger(32768);
             phase_ = 0;
             state_ = 0;
@@ -1089,26 +1090,23 @@ public:
         }
 
         // ---- Noise --------------------------------------
-        int16_t noise = Random::GetSample();
-
-        pg_gate_.Process();
+        // we just use excitation directly, noise just added inconsistency here
+        int32_t envelope = peak_envelope_.Process() >> 4;
 
         int32_t filtered_noise = 0;
-        filtered_noise += noise_filter_.Process(noise);
-        filtered_noise += noise_filter_.Process(noise);
+        filtered_noise += peak_filter_.Process(envelope);
+        filtered_noise += peak_filter_.Process(envelope);
 
-        // gate the noise
-        filtered_noise = filtered_noise * (pg_gate_.done() ? 0 : 1);
-
-        int32_t envelope = noise_envelope_.Process() >> 4;
-        int32_t vca_noise = envelope * filtered_noise >> 14;
+        int32_t vca_noise = filtered_noise;
+        vca_noise = vca_noise * attack_param >> 16;
 
         // ---- Tone ---------------------------------------
         if ((state_ & 0x03) == 0) {
             // this makes the tone excitation 4x longer
-            tone_excitation_ = tone_envelope_.Process() >> 6;
-            pitch_sweep_     = ps_envelope_.Process();
-
+            tone_excitation_ = tone_envelope_.Process() >> 4;
+            // ramp up to limit clicking
+            tone_excitation_ = tone_excitation_ * lut_env_expo[state_ < 255 ? state_ : 255] >> 16;
+            pitch_sweep_      = ps_envelope_.Process();
             phase_increment_ = ComputePhaseIncrement(
                     frequency_
                     + (frequency_ * (65535 - tone_decay_) >> 16)
@@ -1185,13 +1183,11 @@ public:
 
     void set_tone(uint16_t tone) {
         tone_param = tone;
-        noise_filter_.set_frequency(tone >> 2);
+        peak_filter_.set_frequency(tone >> 2);
     }
 
     void set_attack(uint16_t attack) {
         attack_param = attack;
-        pg_gate_.set_delay(attack >> 6);
-        noise_envelope_.set_decay(3968 + (attack >> 9));
     }
 
     void set_decay(uint16_t decay) {
@@ -1212,10 +1208,9 @@ public:
 
 private:
     Excitation tone_envelope_;  // envelope of the tonal part
-    Excitation noise_envelope_; // overall envelope of the kick
-    Excitation pg_gate_;    // gate for the noise
-    Excitation ps_envelope_;    // pitch sweep
-    Svf noise_filter_;  // this filters the noise part of the sound
+    Excitation peak_envelope_; // envelope of the peak part (initial peak click)
+    Excitation ps_envelope_;    // pitch sweep (applies to the tonal part)
+    Svf peak_filter_;  // this filters the peak sound with low pass
 
     // cached
     uint32_t frequency_;
