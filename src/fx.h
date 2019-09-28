@@ -70,6 +70,10 @@ struct Comb {
         return res;
     }
 
+    void set_feedback(uint16_t fb) {
+        feedback = fb;
+    }
+
     uint16_t feedback = 32768;
     uint32_t pos = 0;
     int16_t buffer[Len];
@@ -103,9 +107,12 @@ struct Reverb {
             , ap4(0.5 * 65535)
             , c1(0.773 * 65535)
             , c2(0.802 * 65535)
-            , c3(0.753 * 65536)
+            , c3(0.753 * 65535)
             , c4(0.733 * 65535)
-    {}
+    {
+        // this sets the same constants as specified by jcrev
+        set_feedback(54612);
+    }
 
     void Process(int16_t &left, int16_t &right) {
         int16_t mix = (left + right) >> 1;
@@ -130,6 +137,18 @@ struct Reverb {
 
         return p1;
     }
+
+    void set_feedback(uint16_t fb) {
+        // 1.2 is a reasonable multiplier
+        // that prolongs the reverbation
+        // but in extreme case it will
+        // start to sound periodic
+        c1.set_feedback(1.2 * 0.773 * fb);
+        c2.set_feedback(1.2 * 0.802 * fb);
+        c3.set_feedback(1.2 * 0.753 * fb);
+        c4.set_feedback(1.2 * 0.733 * fb);
+    }
+
 
     // allpass in series
     Allpass<225> ap1;
