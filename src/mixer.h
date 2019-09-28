@@ -3,7 +3,7 @@
 #include <Arduino.h>
 
 #include "peaks-drums.h"
-#include "fx-echo.h"
+#include "fx.h"
 
 class Mixer {
 public:
@@ -104,7 +104,8 @@ public:
         int16_t fx_l = peaks::CLIP(flt);
         int16_t fx_r = peaks::CLIP(frt);
 
-        echo.Process(fx_l, fx_r);
+        //echo.Process(fx_l, fx_r);
+        reverb.Process(fx_l, fx_r);
 
         *left  = peaks::CLIP(lt + fx_l);
         *right = peaks::CLIP(rt + fx_r);
@@ -117,4 +118,5 @@ protected:
     ChannelStatus   status[CHANNEL_MAX];
 
     Echo echo;
+    Reverb reverb;
 };
