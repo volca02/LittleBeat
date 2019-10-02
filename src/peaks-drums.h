@@ -953,7 +953,7 @@ public:
 
     void Init() {
         vca_envelope_.Init();
-        vca_envelope_.set_repeats(2);
+        vca_envelope_.set_repeats(3);
 
         set_fast_decay(DEFAULT_FAST_DECAY);
         set_long_decay(DEFAULT_LONG_DECAY);
